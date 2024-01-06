@@ -1,0 +1,9 @@
+1. Open regedit.exe
+2. Navigate to "Computer\HKEY_CLASSES_ROOT\SystemFileAssociations\.png\Shell"
+3. Right click on Shell -> New -> Key; name it TTFApp
+4. Right click on TTFApp -> New key named command.
+5. With command selected, double click (Default) name, set value data to: 
+"C:\Users\mirel\Documents\GitHub\FFT-Compress-Encrypt\FFTTransform\FFTTransform\bin\Debug\net6.0\FFTTransform.exe" "compress" "%1"
+6. In TTFApp enter text in the (Default) value to be "Compress using FFTTransform"
+7. In TTFApp, add a new String Value, write Icon. Double click icon and set it to the file path to the .ico file
+C:\Users\mirel\Documents\GitHub\FFT-Compress-Encrypt\data\fft.ico
