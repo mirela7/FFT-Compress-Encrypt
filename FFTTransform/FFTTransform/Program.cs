@@ -22,7 +22,7 @@ namespace FFTTransform
             if(args.Length < 2)
             {
                 Console.WriteLine($"Not enough args: expected 2, got {args.Length}.");
-                args = new string[] { OPERATION_COMPRESS, "C:\\Users\\mirel\\Documents\\GitHub\\FFT-Compress-Encrypt\\data\\sample_1920x1280.bmp" };
+                args = new string[] { OPERATION_OPEN, "C:\\Users\\mirel\\Documents\\GitHub\\FFT-Compress-Encrypt\\data\\lamp-test_compressed.bin" };
             }
             
             try
@@ -51,6 +51,7 @@ namespace FFTTransform
                     case OPERATION_OPEN:
                         Algorithms.FFT.OpenCompressedImage(args[1]);
                         Console.WriteLine("Opened image.");
+                        Console.ReadKey();
                         break;
                     case OPERATION_ENCRYPT:
                         break;

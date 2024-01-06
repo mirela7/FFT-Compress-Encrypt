@@ -106,53 +106,62 @@ namespace FFTTransform.Utils
             }
         }
 
-        internal static void WriteImageArrayData(FourierRelatedTransform t, ImageArrayData<object> imageArray, string path)
+        internal static void WriteImageArrayData(FourierRelatedTransform t, ImageArrayData<object>[] imageArray, string path)
         {
             using (FileStream fs = new FileStream(path, FileMode.Create, FileAccess.Write))
             {
                 using (BinaryWriter bw = new BinaryWriter(fs))
                 {
-                    // Write the number of items
-                    bw.Write(imageArray.Rows);
-                    bw.Write(imageArray.Cols);
-                    bw.Write(imageArray.Elements.Count);
-
-                    foreach (var element in imageArray.Elements)
+                    bw.Write(imageArray.Length);
+                    for (int i = 0; i < imageArray.Length; i++)
                     {
-                        bw.Write(element.Row);
-                        bw.Write(element.Column);
-                        t.SerializeObject(bw, element.Value);
+                        // Write the number of items
+                        bw.Write(imageArray[i].Rows);
+                        bw.Write(imageArray[i].Cols);
+                        bw.Write(imageArray[i].Elements.Count);
+
+                        foreach (var element in imageArray[i].Elements)
+                        {
+                            bw.Write(element.Row);
+                            bw.Write(element.Column);
+                            t.SerializeObject(bw, element.Value);
+                        }
                     }
                 }
             }
         }
 
-        public static Complex[,] ReadImageArrayData(FourierRelatedTransform t, string path)
+        public static Complex[][,] ReadImageArrayData(FourierRelatedTransform t, string path)
         {
-            Complex[,] array;
+            Complex[][,] array;
             using (FileStream fs = new FileStream(path, FileMode.Open, FileAccess.Read))
             {
                 using (BinaryReader br = new BinaryReader(fs))
                 {
-                    int rows = br.ReadInt32(), cols = br.ReadInt32();
-                    array = new Complex[rows, cols];
+                    int channels = br.ReadInt32();
+                    array = new Complex[channels][,];
 
-                    int count = br.ReadInt32();
-
-                    for (int i = 0; i < count; i++)
+                    for(int channel = 0; channel < channels; channel++)
                     {
-                        short r = br.ReadInt16(), c = br.ReadInt16();
-                        object val = t.DeserializeObject(br);
-                        if (val is Complex complex)
+                        int rows = br.ReadInt32(), cols = br.ReadInt32();
+                        array[channel] = new Complex[rows, cols];
+
+                        int count = br.ReadInt32();
+
+                        for (int i = 0; i < count; i++)
                         {
-                            array[r, c] = complex;
-                        }
-                        else
-                        {
-                            Console.WriteLine("Warning! Type not recognized.");
+                            short r = br.ReadInt16(), c = br.ReadInt16();
+                            object val = t.DeserializeObject(br);
+                            if (val is Complex complex)
+                            {
+                                array[channel][r, c] = complex;
+                            }
+                            else
+                            {
+                                Console.WriteLine("Warning! Type not recognized.");
+                            }
                         }
                     }
-
                 }
             }
             return array;
