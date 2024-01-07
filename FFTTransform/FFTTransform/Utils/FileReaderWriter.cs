@@ -2,8 +2,10 @@
 using Emgu.CV.ML.MlEnum;
 using Emgu.CV.Structure;
 using FFTTransform.Algorithms;
+using FFTTransform.Algorithms.Encoder;
 using Google.Protobuf.WellKnownTypes;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -13,6 +15,8 @@ using System.Threading.Tasks;
 
 namespace FFTTransform.Utils
 {
+
+    using HuffmanPair = System.Tuple<object, object>;
     internal class FileReaderWriter
     {
         public static void WriteComplexArray(Complex[,] array, string path)
@@ -24,7 +28,6 @@ namespace FFTTransform.Utils
                     // Write the number of items
                     bw.Write(array.GetLength(0));
                     bw.Write(array.GetLength(1));
-
                     for(int i = 0; i < array.GetLength(0); i++)
                     {
                         for(int j = 0; j < array.GetLength(1); j++)
@@ -166,5 +169,28 @@ namespace FFTTransform.Utils
             }
             return array;
         }
+
+        internal static void WriteJpeg(string path, int width, int height, HuffmanCoder dcY, HuffmanCoder dcC, HuffmanCoder acY, HuffmanCoder acC)
+        {
+            using (FileStream fs = new FileStream(path, FileMode.Create, FileAccess.Write))
+            {
+                using (BinaryWriter bw = new BinaryWriter(fs))
+                {
+                    bw.Write(width);
+                    bw.Write(height);
+
+                    HuffmanCoder[] encodings = new HuffmanCoder[] { dcY, dcC, acY, acC };
+                    foreach(HuffmanCoder en in encodings)
+                    {
+                        BitArray array = en.Tree!.TripletsOrderedEncodings;
+                        bw.WriteCompact(array);
+
+                        en.Tree.WriteTreeDictionary(bw);
+                    }
+
+                }
+            }
+        }
+
     }
 }

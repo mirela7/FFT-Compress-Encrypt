@@ -1,5 +1,7 @@
 ﻿using Emgu.CV;
+using Emgu.CV.CvEnum;
 using Emgu.CV.Structure;
+using FFTTransform.Algorithms.Encoder;
 using FFTTransform.Utils;
 using System;
 using System.Collections.Generic;
@@ -10,6 +12,8 @@ using System.Threading.Tasks;
 
 namespace FFTTransform.Algorithms
 {
+    using ZigzagResult = RunLengthCoder.ChannelDcAcResult;
+
     public class CustomJPEG<T1, T2>
     {
         const short MCU_Unit = 8;
@@ -19,24 +23,52 @@ namespace FFTTransform.Algorithms
 
 
         //public FourierRelatedTransform<T, object> Transform { get; set; }
-        public FourierRelatedTransform Transform { get; set; }
+        public DCT Transform { get; set; }
 
-        public CustomJPEG(Image<Gray, byte> image) 
+        public CustomJPEG(string path)
         {
-            Transform = FourierRelatedTransform.Factory(FourierRelatedTransform.TransformType.FFT);
-            Image = ConvertImage(image);
-        }
+            Transform = new DCT();
 
-        public Image<Ycc, byte> ConvertImage(Image<Gray, byte> image)
-        {
-            return image.Convert<Ycc, byte>();
+            Mat inputImage = CvInvoke.Imread(path);
+            if (inputImage == null || inputImage.IsEmpty)
+                throw new ArgumentException("Invalid path.");
+            if (inputImage.Depth == DepthType.Cv8U && inputImage.NumberOfChannels == 3)
+            {
+                Image<Bgr, byte> colorImage = new(inputImage);
+                Image = colorImage.Convert<Ycc, byte>();
+            }
+            else
+            {
+                Image<Gray, byte> colorImage = new(inputImage);
+                Image = colorImage.Convert<Ycc, byte>();
+            }
         }
 
         public void Encode(string path)
         {
             ChromaDownsample();
-            ImageArrayData<object>[,,] data = ProcessMCU();
-            FileReaderWriter.Save(path, data, Transform);
+            ZigzagResult y, cb, cr;
+            (y, cb, cr) = ProcessMCU();
+
+            HuffmanCoder dcY = new(), dcC = new(), acY = new(), acC = new();
+
+            dcY.AddRange(y.DCs);
+            acY.AddRange(y.ACs);
+
+            dcC.AddRange(cb.DCs);
+            dcC.AddRange(cr.DCs);
+
+            acC.AddRange(cb.ACs);
+            acC.AddRange(cr.ACs);
+
+            dcY.Encode();
+            dcC.Encode();
+            acY.Encode();
+            acC.Encode();
+
+            FileReaderWriter.WriteJpeg(path, Image.Width, Image.Height, dcY, dcC, acY, acC);
+
+            //FileReaderWriter.Save(path, data, Transform);
         }
 
         public void ChromaDownsample()
@@ -53,35 +85,43 @@ namespace FFTTransform.Algorithms
 
         }
 
-        public ImageArrayData<object>[,,] ProcessMCU()
+        public (ZigzagResult, ZigzagResult, ZigzagResult) ProcessMCU()
         {
+
             ImageArrayData<object>[,,] MCUArrays = new ImageArrayData<object>[Image.Rows/MCU_Unit, Image.Cols/MCU_Unit, 3];
+
+            ZigzagResult yMcu = new();
+            ZigzagResult cbMcu = new();
+            ZigzagResult crMcu = new();
+
             for (int i = 0; i < Image.Rows; i+= MCU_Unit)
             {
                 for(int j = 0; j < Image.Cols; j+= MCU_Unit)
                 {
                     byte[,] YChannel = SampleYMCU(i, j);
-                    object[,] YTransformed = Transform.Transform(YChannel);
-                    ImageArrayData<object> YCompressed = Transform.WriteToArrayData(YTransformed);
-                    MCUArrays[i/MCU_Unit, j/MCU_Unit, 0] = YCompressed;
+
+                    int[,] YTransformed = Transform.Transform(YChannel);
+                    List<JpegTriplet> YCompressed = RunLengthCoder.ZigZagCode(YTransformed);
+                    
+                    yMcu.AddZigZag(YCompressed);
 
                     if(i % (2*MCU_Unit) == 0 && j % (2*MCU_Unit) == 0)
                     {
                         byte[,] CbChannel = SampleCbMCU(i, j);
                         byte[,] CrChannel = SampleCrMCU(i, j);
 
-                        object[,] CbTransformed = Transform.Transform(CbChannel);
-                        object[,] CrTransformed = Transform.Transform(CrChannel);
+                        int[,] CbTransformed = Transform.Transform(CbChannel);
+                        int[,] CrTransformed = Transform.Transform(CrChannel);
 
-                        ImageArrayData<object> CbCompressed = Transform.WriteToArrayData(CbTransformed);
-                        ImageArrayData<object> CrCompressed = Transform.WriteToArrayData(CrTransformed);
+                        List<JpegTriplet> CbCompressed = RunLengthCoder.ZigZagCode(CbTransformed);
+                        List<JpegTriplet> CrCompressed = RunLengthCoder.ZigZagCode(CrTransformed);
 
-                        MCUArrays[i / MCU_Unit, j / MCU_Unit, 1] = CbCompressed;
-                        MCUArrays[i / MCU_Unit, j / MCU_Unit, 2] = CrCompressed;
+                        cbMcu.AddZigZag(CbCompressed);
+                        crMcu.AddZigZag(CrCompressed);
                     }
                 }
             }
-            return MCUArrays;
+            return (yMcu, cbMcu, crMcu);
         }
 
         public byte[,] SampleYMCU(int tli, int tlj)

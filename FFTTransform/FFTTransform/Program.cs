@@ -1,5 +1,6 @@
 ﻿using Emgu.CV;
 using Emgu.CV.Structure;
+using FFTTransform.Algorithms.Encoder;
 using FFTTransform.Utils;
 using Microsoft.Win32;
 using System.IO;
@@ -22,6 +23,31 @@ namespace FFTTransform
         /// <param name="args"></param>
         static void Main(string[] args)
         {
+            int[,] matrix = {
+                {89, 17, 42, 53, 99, 0, 61, 0},
+                {14, 98, 0, 47, 17, 0, 0, 0},
+                {41, 21, 0, 89, 80, 0, 0, 0},
+                {21, 1, 63, 2, 90, 0, 0, 0},
+                {35, 17, 0, 23, 21, 0, 0, 0},
+                {77, 45, 52, 89, 0, 0, 0, 0},
+                {0, 0, 0, 0, 0, 0, 0, 0},
+                {0, 0, 0, 0, 0, 0, 0, 0}
+            };
+
+            List<JpegTriplet> encoding = RunLengthCoder.ZigZagCode(matrix);
+            Console.WriteLine("\n");
+            foreach (var x in encoding)
+                Console.Write($"({(int)x.ZerosBefore}, {(int)x.NmbBitsForCoeff}, {x.Coeff}) ");
+
+            HuffmanTree tree = new HuffmanTree(encoding);
+            Console.WriteLine(tree.TripletsOrderedEncodings.Length);
+
+            foreach(bool x in tree.TripletsOrderedEncodings)
+                Console.Write((x ? 1 : 0));
+
+
+
+            return;
             if (IsRunningAsAdmin())
             {
                 Console.WriteLine("Run as admin. Creating registry...");
