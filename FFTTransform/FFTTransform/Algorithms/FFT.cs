@@ -9,6 +9,7 @@ using Emgu.CV.Structure;
 using FFTTransform.Utils;
 using Emgu.CV.CvEnum;
 using static System.Net.Mime.MediaTypeNames;
+using Emgu.CV.Dai;
 
 namespace FFTTransform.Algorithms
 {
@@ -178,14 +179,14 @@ namespace FFTTransform.Algorithms
             return channel;
         }
 
-        public static void SetMagnitudeOfComplexMatrixInChannel(Complex[,] image, byte[,,] channels, int c)
+        public static void SetPropertyOfComplexMatrixInChannel<T>(Complex[,] image, T[,,] channels, int c, Func<Complex, T> Property)
         {
             int rows = image.GetLength(0), cols = image.GetLength(1);
             for (int i = 0; i < rows; i++)
             {
                 for (int j = 0; j < cols; j++)
                 {
-                    channels[i, j, c] = (byte)image[i, j].Magnitude;
+                    channels[i, j, c] = Property(image[i, j]);
                 }
             }
         }
@@ -206,48 +207,150 @@ namespace FFTTransform.Algorithms
 
         public static void CompressImageByPath(string p)
         {
+            Console.WriteLine("Is it grayscale? Defaults to 'no'");
+            string response = Console.ReadLine();
+            bool isGrayscale = false;
+            if(response != null && response.Length > 0 && response[0] == 'y')
+                isGrayscale = true;
+
+            Console.WriteLine("Also save magnitude and phase images? ");
+            response = Console.ReadLine();
+            bool debug = false;
+            if (response != null && response.Length > 0 && response[0] == 'y')
+                debug = true;
+
             Mat inputImage = CvInvoke.Imread(p);
             if (inputImage == null || inputImage.IsEmpty)
                 throw new ArgumentException("Invalid path.");
 
-            if (inputImage.Depth == DepthType.Cv8U && inputImage.NumberOfChannels == 1)
-            {
 
-                Image<Gray, byte> grayImage = new(inputImage);
+            string magnitudePath = $"{PathUtil.GetPathWithoutFileExtension(p)}_magnitude.bmp";
+            string phasePath = $"{PathUtil.GetPathWithoutFileExtension(p)}_phase.bmp";
+
+            if (isGrayscale)
+            {
+                Image<Gray, byte> grayImage;
+                Console.WriteLine("BW image compressing...");
+                if (inputImage.NumberOfChannels > 1)
+                    grayImage = new Image<Bgr, byte>(inputImage).Convert<Gray, byte>();
+                else
+                    grayImage = new(inputImage);
+
                 Complex[,] complexImage = ConvertImageToComplexMatrix(grayImage);
 
                 ImageArrayData<object> writableResult;
-                FFTComplexChannel(complexImage, out writableResult);
+                Complex[,] fftImage;
+                FFTComplexChannel(complexImage, out fftImage, out writableResult);
 
                 string outputPath = $"{PathUtil.GetPathWithoutFileExtension(p)}_compressed.bin";
                 FileReaderWriter.WriteImageArrayData(new FFT(), new ImageArrayData<object>[] { writableResult }, outputPath);
 
+                if(debug)
+                {
+
+                    double[,,] magnitudeMatrix = new double[grayImage.Height, grayImage.Width, 1];
+                    double[,,] phaseMatrix = new double[grayImage.Height, grayImage.Width, 1];
+                    
+                    SetPropertyOfComplexMatrixInChannel(fftImage, magnitudeMatrix, 0, (c) => c.Magnitude);
+                    SetPropertyOfComplexMatrixInChannel(fftImage, phaseMatrix, 0, (c) => c.Phase);
+
+                    double minMagnitude = Math.Log(magnitudeMatrix.Cast<double>().Min());
+                    double maxMagnitude = Math.Log(magnitudeMatrix.Cast<double>().Max());
+                    double minPhase = phaseMatrix.Cast<double>().Min();
+                    double maxPhase = phaseMatrix.Cast<double>().Max();
+
+                    byte[,,] byteMagnitudeMatrix = new byte[magnitudeMatrix.GetLength(0), magnitudeMatrix.GetLength(1), magnitudeMatrix.GetLength(2)];
+                    byte[,,] bytePhaseMatrix = new byte[magnitudeMatrix.GetLength(0), magnitudeMatrix.GetLength(1), magnitudeMatrix.GetLength(2)];
+
+                    TransferMatrixChannel(magnitudeMatrix, byteMagnitudeMatrix, 0, (db) => (byte)(255.0 * (Math.Log(db) - minMagnitude) / (maxMagnitude - minMagnitude)));
+                    TransferMatrixChannel(phaseMatrix, bytePhaseMatrix, 0, (db) => (byte)(255.0 * (db - minPhase) / (maxPhase - minPhase)));
+
+                    FFTShift(byteMagnitudeMatrix);
+
+                    Image<Gray, byte> magImage = new(byteMagnitudeMatrix);
+                    Image<Gray, byte> phaseImage = new(bytePhaseMatrix);
+
+                    CvInvoke.Imwrite(magnitudePath, magImage);
+                    CvInvoke.Imwrite(phasePath, phaseImage);
+                }
+
             }
-            else if (inputImage.Depth == DepthType.Cv8U && inputImage.NumberOfChannels == 3)
+            else
             {
+                //if (inputImage.Depth == DepthType.Cv8U && inputImage.NumberOfChannels == 3)
+                Console.WriteLine("RGB image compressing....");
                 
                 string outputPath = $"{PathUtil.GetPathWithoutFileExtension(p)}_compressed.bin";
                 Image<Bgr, byte> colorImage = new(inputImage);
                 // Process the color image as needed
+
+                double[,,] magnitudeMatrix = new double[colorImage.Height, colorImage.Width, 3];
+                double[,,] phaseMatrix = new double[colorImage.Height, colorImage.Width, 3];
 
 
                 ImageArrayData<object>[] channelsWritableResult = new ImageArrayData<object>[3];
 
                 for (int i = 0; i <= 2; i++)
                 {
+                    Console.WriteLine($"Compressing channel {i}...");
                     Complex[,] complexImage = ConvertImageToComplexMatrix(colorImage, i);
-                    FFTComplexChannel(complexImage, out channelsWritableResult[i]);
+                    Complex[,] fftImage;
+                    FFTComplexChannel(complexImage, out fftImage, out channelsWritableResult[i]);
+
+                    if (debug)
+                    {
+                        SetPropertyOfComplexMatrixInChannel(fftImage, magnitudeMatrix, i, (c) => c.Magnitude);
+                        SetPropertyOfComplexMatrixInChannel(fftImage, phaseMatrix, i, (c) => c.Phase);
+                    }
+
                 }
+
                 FileReaderWriter.WriteImageArrayData(new FFT(), channelsWritableResult, outputPath);
+
+                if (debug)
+                {
+                    double minMagnitude = Math.Log(magnitudeMatrix.Cast<double>().Min());
+                    double maxMagnitude = Math.Log(magnitudeMatrix.Cast<double>().Max());
+                    double minPhase = phaseMatrix.Cast<double>().Min();
+                    double maxPhase = phaseMatrix.Cast<double>().Max();
+
+                    byte[,,] byteMagnitudeMatrix = new byte[magnitudeMatrix.GetLength(0), magnitudeMatrix.GetLength(1), magnitudeMatrix.GetLength(2)];
+                    byte[,,] bytePhaseMatrix = new byte[magnitudeMatrix.GetLength(0), magnitudeMatrix.GetLength(1), magnitudeMatrix.GetLength(2)];
+
+                    for (int c = 0; c < 3; c++)
+                    {
+                        TransferMatrixChannel(magnitudeMatrix, byteMagnitudeMatrix, c, (db) => (byte)(255.0 * (Math.Log(db) - minMagnitude) / (maxMagnitude - minMagnitude)));
+                        TransferMatrixChannel(phaseMatrix, bytePhaseMatrix, c, (db) => (byte)(255.0 * (db - minPhase) / (maxPhase - minPhase)));
+                    }
+
+                    FFTShift(byteMagnitudeMatrix);
+
+
+                    Image<Bgr, byte> magImage = new(byteMagnitudeMatrix);
+                    Image<Bgr, byte> phaseImage = new(bytePhaseMatrix);
+
+                    CvInvoke.Imwrite(magnitudePath, magImage);
+                    CvInvoke.Imwrite(phasePath, phaseImage);
+                }
+
             }
-            else
-                throw new ArgumentException("Unsupported image format.");
 
         }
 
-        private static void FFTComplexChannel(Complex[,] complexImage, out ImageArrayData<object> writableResult)
+        private static void TransferMatrixChannel<TIN, TOUT>(TIN[,,] inputMatrix, TOUT[,,] outputMatrix, int c, Func<TIN, TOUT> convertFunc) where TOUT : new()
         {
-            Complex[,] outputImage = FFT2D(complexImage);
+            if(outputMatrix == null)
+                outputMatrix = new TOUT[inputMatrix.GetLength(0), inputMatrix.GetLength(1), inputMatrix.GetLength(2)];
+            for(int i = 0; i < inputMatrix.GetLength(0); i++)
+                for(int j = 0; j < inputMatrix.GetLength(1); j++)
+                {
+                    outputMatrix[i, j, c] = convertFunc(inputMatrix[i, j, c]);
+                }
+        }
+
+        private static void FFTComplexChannel(Complex[,] complexImage, out Complex[,] outputImage, out ImageArrayData<object> writableResult)
+        {
+            outputImage = FFT2D(complexImage);
             // save outputImage to file. (automat ${p}_compressed.b)
             writableResult = new ImageArrayData<object>();
             writableResult.InitializeFromMatrix(outputImage, ComplexToObject(outputImage), (c) => false);
@@ -273,7 +376,8 @@ namespace FFTTransform.Algorithms
             {
                 Complex[,] outputImage = FFT2D(inputImage[i], inverse: true);
                 byte[,] magnitude = MagnitudeOfComplexMatrix(outputImage);
-                SetMagnitudeOfComplexMatrixInChannel(outputImage, outputImageChannels, i);
+                SetPropertyOfComplexMatrixInChannel(outputImage, outputImageChannels, i, (c) => (byte)c.Magnitude);
+                //SetMagnitudeOfComplexMatrixInChannel(outputImage, outputImageChannels, i);
             }
 
             if(inputImage.Length == 1) // BW
@@ -322,6 +426,36 @@ namespace FFTTransform.Algorithms
                 .Value;
             writableResult.InitializeFromMatrix(complexData, ComplexToObject(complexData), (c) => c.Magnitude <= topMagnitude);
             return writableResult;
+        }
+
+        public static void FFTShift(byte[,,] processedMatrix)
+        {
+            for (int i = 0; i < processedMatrix.GetLength(0) / 2; i++)
+            {
+                for (int j = 0; j < processedMatrix.GetLength(1); j++)
+                {
+                    for(int c = 0; c < processedMatrix.GetLength(2); c++)
+                    {
+                        byte aux = processedMatrix[i, j, c];
+                        processedMatrix[i, j, c] = processedMatrix[i + processedMatrix.GetLength(0) / 2, j, c];
+                        processedMatrix[i + processedMatrix.GetLength(0) / 2, j, c] = aux;
+                    }
+                    
+                }
+            }
+
+            for (int i = 0; i < processedMatrix.GetLength(0); i++)
+            {
+                for (int j = 0; j < processedMatrix.GetLength(1) / 2; j++)
+                {
+                    for(int c = 0; c < processedMatrix.GetLength(2); c++)
+                    {
+                        byte aux = processedMatrix[i, j, c];
+                        processedMatrix[i, j, c] = processedMatrix[i, j + processedMatrix.GetLength(1) / 2, c];
+                        processedMatrix[i, j + processedMatrix.GetLength(1) / 2, c] = aux;
+                    }
+                }
+            }
         }
 
         public override object[,] ReadFromArrayData(ImageArrayData<object> arrayData)

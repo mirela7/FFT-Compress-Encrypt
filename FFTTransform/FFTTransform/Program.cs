@@ -24,7 +24,7 @@ namespace FFTTransform
         {
             if (IsRunningAsAdmin())
             {
-                Console.WriteLine("Run as admin");
+                Console.WriteLine("Run as admin. Creating registry...");
                 createRegistry();
             }
             else
@@ -35,7 +35,7 @@ namespace FFTTransform
             if(args.Length < 2)
             {
                 Console.WriteLine($"Not enough args: expected 2, got {args.Length}.");
-                args = new string[] { OPERATION_OPEN, "C:\\Users\\mirel\\Documents\\GitHub\\FFT-Compress-Encrypt\\data\\lamp-test_compressed.bin" };
+                args = new string[] { OPERATION_COMPRESS, "C:\\Users\\mirel\\Documents\\GitHub\\FFT-Compress-Encrypt\\data\\grayscale-lamp.png" };
             }
             
             try
@@ -44,7 +44,7 @@ namespace FFTTransform
                 switch (command)
                 {
                     case OPERATION_COMPRESS:
-                        Console.WriteLine("Keep Percentage default?");
+                        Console.WriteLine($"{OPERATION_COMPRESS}! Keep Percentage default?");
 
                         string response = Console.ReadLine();
                         if (response != null && response.Length > 0 && response[0] == 'n')
@@ -58,6 +58,7 @@ namespace FFTTransform
                             else
                                 Algorithms.FFT.KeepPerentage = keepPct;
                         }
+                        Console.WriteLine("Compression starting...");
                         Algorithms.FFT.CompressImageByPath(args[1]);
                         Console.WriteLine("Compressed image.");
                         break;

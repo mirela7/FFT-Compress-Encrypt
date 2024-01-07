@@ -6,9 +6,9 @@ PI project
 
 | Initial Image | Kept FFT Precentage | Decompressed image | Compression Rate |
 |---|---|---|---|
-|<img src="./data/lamp-test_bw.bmp" width="150px" /> | 1% | <img src="./data/lamp-test_bw_compressed_decompressed_01.bmp" width="150px" /> | Original size: 16MB <br> Compressed binary: 838.872KB |
-|<img src="./data/lamp-test_bw.bmp" width="150px" /> | 2% | <img src="./data/lamp-test_bw_compressed_decompressed_02.bmp" width="150px" /> | Original size: 16MB <br> Compressed binary: 1.59MB |
-|<img src="./data/lamp-test_bw.bmp" width="150px" /> | 5% | <img src="./data/lamp-test_bw_compressed_decompressed_05.bmp" width="150px" /> | Original size: 16MB <br> Compressed binary: 4MB |
+|<img src="./data/grayscale-lamp.png" width="150px" /> | 1% | <img src="./data/lamp-test_bw_compressed_decompressed_01.bmp" width="150px" /> | Original size: 16MB <br> Compressed binary: 838.872KB |
+|<img src="./data/grayscale-lamp.png" width="150px" /> | 2% | <img src="./data/lamp-test_bw_compressed_decompressed_02.bmp" width="150px" /> | Original size: 16MB <br> Compressed binary: 1.59MB |
+|<img src="./data/grayscale-lamp.png" width="150px" /> | 5% | <img src="./data/lamp-test_bw_compressed_decompressed_05.bmp" width="150px" /> | Original size: 16MB <br> Compressed binary: 4MB |
 |<img src="./data/lamp-test.bmp" width="150px" /> | 1% | <img src="./data/lamp-test_compressed_decompressed_01.bmp" width="150px" /> | Original size: 16MB <br> Compressed binary: 2.39MB |
 |<img src="./data/lamp-test.bmp" width="150px" /> | 2% | <img src="./data/lamp-test_compressed_decompressed_02.bmp" width="150px" /> | Original size: 16MB <br> Compressed binary: 4.80MB |
 |<img src="./data/lamp-test.bmp" width="150px" /> | 5% | <img src="./data/lamp-test_compressed_decompressed_05.bmp" width="150px" />| Original size: 16MB <br> Compressed binary: 12.00MB |
