@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace FFTTransform.Utils
 {
-    internal static class BinaryWriterExtension
+    internal static class BinaryReaderWriterExtension
     {
         public static void WriteCompact(this BinaryWriter bw, BitArray bitArray)
         {
@@ -33,6 +33,29 @@ namespace FFTTransform.Utils
 
             bw.Write(length);
             bw.Write(data);
+        }
+
+        public static BitArray ReadCompact(this BinaryReader br)
+        {
+            int length = br.ReadInt32();
+
+            BitArray arr = new BitArray(length);
+
+            byte[] data = br.ReadBytes(length / 8 + 1);
+
+            int index = 0;
+            foreach (byte byt in data)
+            {
+                byte pow = 7;
+                while(pow >= 0 && index < length)
+                {
+                    arr.Set(index, (byt & (1<<pow)) == 1);
+                    index++;
+                    pow--;
+                }
+
+            }
+            return arr;
         }
     }
 }

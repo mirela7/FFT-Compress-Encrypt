@@ -15,5 +15,9 @@ namespace FFTTransform.Algorithms
             return new int[,] { { 0 } };
         }
 
+        internal byte[,] InverseTransform(int[,] yChannelBefore)
+        {
+            throw new NotImplementedException();
+        }
     }
 }
