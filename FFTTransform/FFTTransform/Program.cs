@@ -1,7 +1,10 @@
 ﻿using Emgu.CV;
 using Emgu.CV.Structure;
 using FFTTransform.Utils;
+using Microsoft.Win32;
 using System.IO;
+using System.Reflection;
+using System.Security.Principal;
 
 namespace FFTTransform
 {
@@ -19,6 +22,16 @@ namespace FFTTransform
         /// <param name="args"></param>
         static void Main(string[] args)
         {
+            if (IsRunningAsAdmin())
+            {
+                Console.WriteLine("Run as admin");
+                createRegistry();
+            }
+            else
+            {
+                Console.WriteLine("Run as guest");
+            }
+
             if(args.Length < 2)
             {
                 Console.WriteLine($"Not enough args: expected 2, got {args.Length}.");
@@ -70,7 +83,128 @@ namespace FFTTransform
 
         static void createRegistry()
         {
+            try
+            {
+                string dllPath = Assembly.GetExecutingAssembly().Location;
+                string exePath = $"{PathUtil.GetPathWithoutFileExtension(dllPath)}.exe";
+                string exeDirectory = Path.GetDirectoryName(exePath);
 
+                string imageShell = @"SystemFileAssociations\image\shell";
+                string binKeyLocation = @"SystemFileAssociations\.bin";
+
+                // Navigate to "Computer\HKEY_CLASSES_ROOT\SystemFileAssociations\.png\Shell"
+                using (RegistryKey imageShellKey = Registry.ClassesRoot.OpenSubKey(imageShell, true))
+                {
+                    if (imageShellKey != null)
+                    {
+                        using (RegistryKey tffAppKey = Registry.ClassesRoot.OpenSubKey(@$"{imageShell}\TFFApp", true))
+                        {
+                            if (tffAppKey != null)
+                            {
+                                Console.WriteLine("The registry is already set.");
+                                return;
+                            }
+
+                            // Create TTFApp key
+                            using (RegistryKey ttfAppKey = imageShellKey.CreateSubKey("TTFApp"))
+                            {
+                                // Create command key
+                                using (RegistryKey commandKey = ttfAppKey.CreateSubKey("command"))
+                                {
+                                    // Set default value of the command key
+                                    commandKey.SetValue("", $"\"{exePath}\" \"{OPERATION_COMPRESS}\" \"%1\"");
+
+                                    // Set default value of TTFApp key
+                                    ttfAppKey.SetValue("", "Compress using FFTTransform");
+
+                                    // Create and set the Icon value
+                                    ttfAppKey.SetValue("Icon", @$"{exeDirectory}\fft.ico");
+                                }
+
+                                Console.WriteLine("Registry modifications completed successfully.");
+                            }
+
+
+                        }
+
+                    }
+                    else
+                    {
+                        Console.WriteLine("ImageRegistry key not found. Make sure the specified path exists.");
+                    }
+                }
+
+                using (RegistryKey binShellKey = Registry.ClassesRoot.OpenSubKey(binKeyLocation, true))
+                {
+                    if (binShellKey != null)
+                    {
+                        using (RegistryKey shellKey = binShellKey.OpenSubKey("Shell"))
+                        {
+                            using (RegistryKey ttfAppKey = binShellKey.OpenSubKey("TTFApp"))
+                            {
+                                if (ttfAppKey != null)
+                                {
+                                    Console.WriteLine("The registry is already set.");
+                                    return;
+                                }
+                            }
+
+                            using (RegistryKey ttfAppKey = binShellKey.CreateSubKey("TTFApp"))
+                            {
+                                using (RegistryKey commandKey = ttfAppKey.CreateSubKey("command"))
+                                {
+                                        // Set default value of the command key
+                                    commandKey.SetValue("", $"\"{exePath}\" \"{OPERATION_OPEN}\" \"%1\"");
+
+                                    // Set default value of TTFApp key
+                                    ttfAppKey.SetValue("", "Open using FFTTransform");
+
+                                    // Create and set the Icon value
+                                    ttfAppKey.SetValue("Icon", @$"{exeDirectory}\fft.ico");
+
+                                    Console.WriteLine("Registry modifications completed successfully.");
+                                }
+                            }
+                        }
+
+                    }
+                    else
+                    {
+                        using (RegistryKey baseKey = Registry.ClassesRoot.OpenSubKey(@"SystemFileAssociations"))
+                        {
+                            using (RegistryKey binKey = baseKey.CreateSubKey(".bin"))
+                            {
+                                using (RegistryKey shellKey = binKey.CreateSubKey("Shell"))
+                                {
+                                    using (RegistryKey ttfKey = shellKey.CreateSubKey("TTFApp"))
+                                    {
+                                        using (RegistryKey commandKey = shellKey.CreateSubKey("command"))
+                                        {
+                                            commandKey.SetValue("", $"\"{exePath}\" \"{OPERATION_OPEN}\" \"%1\"");
+                                            ttfKey.SetValue("", "Open using FFTTransform");
+                                            ttfKey.SetValue("Icon", @$"{exeDirectory}\fft.ico");
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("An error occurred: " + ex.Message);
+            }
+        }
+
+        static bool IsRunningAsAdmin()
+        {
+            WindowsIdentity currentIdentity = WindowsIdentity.GetCurrent();
+            WindowsPrincipal principal = new WindowsPrincipal(currentIdentity);
+
+            // Check if the current user is a member of the Administrators group
+            return principal.IsInRole(WindowsBuiltInRole.Administrator);
         }
     }
 }
