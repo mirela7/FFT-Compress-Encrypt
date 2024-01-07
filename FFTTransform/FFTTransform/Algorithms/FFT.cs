@@ -17,6 +17,12 @@ namespace FFTTransform.Algorithms
     {
         public static double KeepPerentage = 0.01;
 
+        public enum FftType
+        {
+            RECURSIVE,
+            ITERATIVE
+        }
+
         /// <summary>
         /// Implements DFT on a vector of complex numbers
         /// </summary>
@@ -64,6 +70,61 @@ namespace FFTTransform.Algorithms
             }
         }
 
+
+
+        private static int[] GetPermutationOfIndices(int n)
+        {
+            int[] result = new int[n];
+            for (int i = 1, j = 0; i < n; i++)
+            {
+                int bit = n >> 1;
+                // in bit reverse order, increasing i by 1 results in 
+                // increasing by 1 in the other end, therefore we transform
+                // all first 1's in 0's and bit reverse the last 0
+                for (; (j & bit) != 0; bit >>= 1)
+                    j ^= bit;
+                j ^= bit;
+                result[i] = j;
+            }
+            return result;
+        }
+
+        public static void fft(List<Complex> vect, bool invert, int[] swap_indices)
+        {
+            // arrange the vector for our indices:
+            // ex: a0, a1, a2, a3, a4, a5, a6, a7
+            // => [(a0, a4), (a2, a6)], [(a1, a5), (a3, a7)]
+            int n = vect.Count;
+            for (int i = 0; i < n; i++)
+                if (i < swap_indices[i])
+                    (vect[i], vect[swap_indices[i]]) = (vect[swap_indices[i]], vect[i]);
+
+            // groups of size len
+            for (int len = 2; len <= n; len <<= 1)
+            {
+                double ang = 2 * Math.PI / n * (invert ? 1 : -1); // twiddle factor
+                Complex w_n = new Complex(Math.Cos(ang), Math.Sin(ang));
+                for (int i = 0; i < n; i += len)
+                {
+                    Complex w = new Complex(1, 0);
+                    for (int j = 0; j < len / 2; j++)
+                    {
+                        Complex u = vect[i + j], v = vect[i + j + len / 2] * w;
+                        // butterfly algorithm
+                        vect[i + j] = u + v;
+                        vect[i + j + len / 2] = u - v;
+                        w *= w_n;
+                    }
+                }
+            }
+
+            if (invert)
+                for (int i = 0; i < n; i++)
+                    vect[i] /= n;
+
+        }
+
+
         private static void PrintList<T>(String message, List<T> val)
         {
             Console.WriteLine(message);
@@ -72,11 +133,13 @@ namespace FFTTransform.Algorithms
             Console.WriteLine();
         }
 
-        public static Complex[,] FFT2D(Complex[,] inputImage, bool inverse = false, bool debug = false)
+        public static Complex[,] FFT2D(Complex[,] inputImage, bool inverse = false, FftType fftType = FftType.RECURSIVE, bool debug = false)
         {
             Complex[,] finalImage = new Complex[inputImage.GetLength(0), inputImage.GetLength(1)];
             Complex zero = new Complex(0, 0);
-
+            int[] swap_indices = null;
+            if (fftType == FftType.ITERATIVE)
+                swap_indices = GetPermutationOfIndices(inputImage.GetLength(0));
             // First Apply FFT on lines
             for (int i = 0; i < inputImage.GetLength(0); i++)
             {
@@ -91,7 +154,17 @@ namespace FFTTransform.Algorithms
                 if (debug)
                     PrintList<Complex>("Applying FFT on row: ", row);
 
-                fft_recursive(row, inverse);
+                switch (fftType)
+                {
+                    case FftType.RECURSIVE:
+                        fft_recursive(row, inverse);
+                        break;
+                    case FftType.ITERATIVE:
+                        fft(row, inverse, swap_indices);
+                        break;
+                    default:
+                        break;
+                }
 
                 if (debug)
                     PrintList<Complex>("The result is: ", row);
@@ -100,7 +173,8 @@ namespace FFTTransform.Algorithms
                 for (int j = 0; j < inputImage.GetLength(1); j++)
                     finalImage[i, j] = row[j];
             }
-
+            if (fftType == FftType.ITERATIVE)
+                swap_indices = GetPermutationOfIndices(inputImage.GetLength(1));
             // Apply FFT on columns
             for (int j = 0; j < inputImage.GetLength(1); j++)
             {
@@ -113,7 +187,17 @@ namespace FFTTransform.Algorithms
                 if (debug)
                     PrintList<Complex>("Applying FFT on column: ", column);
 
-                fft_recursive(column, inverse);
+                switch (fftType)
+                {
+                    case FftType.RECURSIVE:
+                        fft_recursive(column, inverse);
+                        break;
+                    case FftType.ITERATIVE:
+                        fft(column, inverse, swap_indices);
+                        break;
+                    default:
+                        break;
+                }
 
                 if (debug)
                     PrintList<Complex>("The result is: ", column);
@@ -125,6 +209,7 @@ namespace FFTTransform.Algorithms
 
             return finalImage;
         }
+
 
         public static Complex[,] ConvertImageToComplexMatrix(Image<Gray, byte> inputImage)
         {
@@ -350,7 +435,7 @@ namespace FFTTransform.Algorithms
 
         private static void FFTComplexChannel(Complex[,] complexImage, out Complex[,] outputImage, out ImageArrayData<object> writableResult)
         {
-            outputImage = FFT2D(complexImage);
+            outputImage = FFT2D(complexImage, fftType: FftType.ITERATIVE);
             // save outputImage to file. (automat ${p}_compressed.b)
             writableResult = new ImageArrayData<object>();
             writableResult.InitializeFromMatrix(outputImage, ComplexToObject(outputImage), (c) => false);
@@ -374,7 +459,7 @@ namespace FFTTransform.Algorithms
             byte[,,] outputImageChannels = new byte[inputImage[0].GetLength(0), inputImage[0].GetLength(1), inputImage.Length];
             for(int i = 0; i < inputImage.Length; i++)
             {
-                Complex[,] outputImage = FFT2D(inputImage[i], inverse: true);
+                Complex[,] outputImage = FFT2D(inputImage[i], fftType: FftType.ITERATIVE,inverse: true);
                 byte[,] magnitude = MagnitudeOfComplexMatrix(outputImage);
                 SetPropertyOfComplexMatrixInChannel(outputImage, outputImageChannels, i, (c) => (byte)c.Magnitude);
                 //SetMagnitudeOfComplexMatrixInChannel(outputImage, outputImageChannels, i);
@@ -404,7 +489,7 @@ namespace FFTTransform.Algorithms
         public override object[,] Transform(byte[,] channel)
         {
             Complex[,] complexImage = ConvertByteToComplexMatrix(channel);
-            Complex[,] outputImage = FFT2D(complexImage);
+            Complex[,] outputImage = FFT2D(complexImage, fftType: FftType.ITERATIVE);
 
             return ComplexToObject(outputImage);
         }
@@ -412,7 +497,7 @@ namespace FFTTransform.Algorithms
         public override byte[,] InverseTransform(object[,] data)
         {
             Complex[,] inputImage = ObjectToComplex(data);
-            Complex[,] outputImage = FFT2D(inputImage, inverse: true);
+            Complex[,] outputImage = FFT2D(inputImage, fftType: FftType.ITERATIVE,inverse: true);
             return MagnitudeOfImageAsByteArray(outputImage);
         }
 

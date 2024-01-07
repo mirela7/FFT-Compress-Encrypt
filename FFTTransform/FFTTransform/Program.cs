@@ -3,6 +3,7 @@ using Emgu.CV.Structure;
 using FFTTransform.Algorithms.Encoder;
 using FFTTransform.Utils;
 using Microsoft.Win32;
+using System.Diagnostics;
 using System.IO;
 using System.Reflection;
 using System.Security.Principal;
@@ -85,8 +86,18 @@ namespace FFTTransform
                                 Algorithms.FFT.KeepPerentage = keepPct;
                         }
                         Console.WriteLine("Compression starting...");
+                        var timer = new Stopwatch();
+                        timer.Start();
                         Algorithms.FFT.CompressImageByPath(args[1]);
-                        Console.WriteLine("Compressed image.");
+
+                        //B: Run stuff you want timed
+                        timer.Stop();
+
+                        TimeSpan timeTaken = timer.Elapsed;
+                        string foo = "Time taken: " + timeTaken.ToString(@"m\:ss\.fff");
+                        Console.WriteLine($"Compressed image. {foo}");
+                        Console.ReadKey();
+
                         break;
                     case OPERATION_OPEN:
                         Algorithms.FFT.OpenCompressedImage(args[1]);
@@ -120,7 +131,7 @@ namespace FFTTransform
                 string binKeyLocation = @"SystemFileAssociations\.bin";
 
                 // Navigate to "Computer\HKEY_CLASSES_ROOT\SystemFileAssociations\.png\Shell"
-                using (RegistryKey imageShellKey = Registry.ClassesRoot.OpenSubKey(imageShell, true))
+                /*using (RegistryKey imageShellKey = Registry.ClassesRoot.OpenSubKey(imageShell, true))
                 {
                     if (imageShellKey != null)
                     {
@@ -159,12 +170,16 @@ namespace FFTTransform
                     {
                         Console.WriteLine("ImageRegistry key not found. Make sure the specified path exists.");
                     }
-                }
+                }*/
 
+                Console.WriteLine("Before open subkey");
                 using (RegistryKey binShellKey = Registry.ClassesRoot.OpenSubKey(binKeyLocation, true))
                 {
+                    Console.WriteLine("Opened subkey");
+                    Console.WriteLine(binShellKey == null);
                     if (binShellKey != null)
                     {
+                        Console.WriteLine("bin extension registry exists.");
                         using (RegistryKey shellKey = binShellKey.OpenSubKey("Shell"))
                         {
                             using (RegistryKey ttfAppKey = binShellKey.OpenSubKey("TTFApp"))
@@ -197,16 +212,19 @@ namespace FFTTransform
                     }
                     else
                     {
-                        using (RegistryKey baseKey = Registry.ClassesRoot.OpenSubKey(@"SystemFileAssociations"))
+                        using (RegistryKey baseKey = Registry.ClassesRoot.OpenSubKey(@"SystemFileAssociations", true))
                         {
-                            using (RegistryKey binKey = baseKey.CreateSubKey(".bin"))
+                            using (RegistryKey binKey = baseKey.CreateSubKey(".bin", true))
                             {
-                                using (RegistryKey shellKey = binKey.CreateSubKey("Shell"))
+                                using (RegistryKey shellKey = binKey.CreateSubKey("Shell", true))
                                 {
-                                    using (RegistryKey ttfKey = shellKey.CreateSubKey("TTFApp"))
+                                    using (RegistryKey ttfKey = shellKey.CreateSubKey("TTFApp", true))
                                     {
-                                        using (RegistryKey commandKey = shellKey.CreateSubKey("command"))
+                                        using (RegistryKey commandKey = ttfKey.CreateSubKey("command", true))
                                         {
+                                            if (baseKey == null)
+                                                Console.WriteLine("commandKey null.");
+                                            else Console.WriteLine("commandKey created");
                                             commandKey.SetValue("", $"\"{exePath}\" \"{OPERATION_OPEN}\" \"%1\"");
                                             ttfKey.SetValue("", "Open using FFTTransform");
                                             ttfKey.SetValue("Icon", @$"{exeDirectory}\fft.ico");
