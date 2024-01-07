@@ -12,6 +12,7 @@ using System.Threading.Tasks;
 
 namespace FFTTransform.Algorithms
 {
+    using static System.Net.Mime.MediaTypeNames;
     using ZigzagResult = RunLengthCoder.ChannelDcAcResult;
 
     public class CustomJPEG<T1, T2>
@@ -66,9 +67,26 @@ namespace FFTTransform.Algorithms
             acY.Encode();
             acC.Encode();
 
-            FileReaderWriter.WriteJpeg(path, Image.Width, Image.Height, dcY, dcC, acY, acC);
+            string outputPath = $"{PathUtil.GetPathWithoutFileExtension(path)}_decompressed.bin";
 
-            //FileReaderWriter.Save(path, data, Transform);
+            FileReaderWriter.WriteJpeg(outputPath, Image.Width, Image.Height, dcY, dcC, acY, acC);
+        }
+
+        public void Decode(string path)
+        {
+            int imageWidth, imageHeight;
+            HuffmanCoder dcY, dcC, acY, acC;
+
+            FileReaderWriter.ReadJpeg(path, out imageWidth, out imageHeight, out dcY, out dcC, out acY, out acC);
+
+            RebuildMCU(imageWidth, imageHeight, dcY, dcC, acY, acC);
+            ChromaUpsample();
+
+            string outputPath = $"{PathUtil.GetPathWithoutFileExtension(path)}_decompressed.bmp";
+
+            CvInvoke.Imwrite(outputPath, Image);
+            CvInvoke.Imshow("Image", Image);
+            CvInvoke.WaitKey();
         }
 
         public void ChromaDownsample()
@@ -85,11 +103,58 @@ namespace FFTTransform.Algorithms
 
         }
 
-        public (ZigzagResult, ZigzagResult, ZigzagResult) ProcessMCU()
+        public void ChromaUpsample()
+        {
+            for(int i = 0; i <= Image.Height; i ++)
+                for(int j = 0; j <= Image.Width; j++)
+                {
+                    Image.Data[i, j, 1] = DownsampledCbCr.Data[i / 2, j / 2, 1];
+                    Image.Data[i, j, 2] = DownsampledCbCr.Data[i / 2, j / 2, 2];
+                }
+        }
+
+        public void RebuildMCU(int imageWidth, int imageHeight, HuffmanCoder dcY, HuffmanCoder dcC, HuffmanCoder acY, HuffmanCoder acC)
         {
 
-            ImageArrayData<object>[,,] MCUArrays = new ImageArrayData<object>[Image.Rows/MCU_Unit, Image.Cols/MCU_Unit, 3];
+            ZigzagResult yMcu = new(acY.Triplets, dcY.Triplets);
+            ZigzagResult cMcu = new(acC.Triplets, dcC.Triplets);
+            Image = new Image<Ycc, byte>(imageWidth, imageHeight);
 
+            for (int i = 0; i < imageWidth; i+=MCU_Unit)
+            {
+                for(int j = 0; j < imageHeight; j += MCU_Unit)
+                {
+                    List<JpegTriplet> unitYList = yMcu.PopZigZag();
+                    int[,] YChannelBefore = RunLengthCoder.ZigZagDecode(unitYList, MCU_Unit);
+
+                    //YChannelBefore = Quantization.Dequantize(YChannelBefore, Type.Y);
+                    byte[,] YChannel = Transform.InverseTransform(YChannelBefore);
+
+                    PutYMCU(i, j, YChannel);
+
+                    if (i % (2 * MCU_Unit) == 0 && j % (2 * MCU_Unit) == 0)
+                    {
+                        List<JpegTriplet> unitCbList = cMcu.PopZigZag();
+                        List<JpegTriplet> unitCrList = cMcu.PopZigZag();
+
+                        int[,] CbChannelBefore = RunLengthCoder.ZigZagDecode(unitCbList, MCU_Unit);
+                        int[,] CrChannelBefore = RunLengthCoder.ZigZagDecode(unitCrList, MCU_Unit);
+
+                        //CbChannelBefore = Quantization.Dequantize(CbChannelBefore, Type.Y);
+                        //CrChannelBefore = Quantization.Dequantize(CrChannelBefore, Type.Y);
+
+                        byte[,] CbChannel = Transform.InverseTransform(CbChannelBefore);
+                        byte[,] CrChannel = Transform.InverseTransform(CrChannelBefore);
+                        
+                        PutCbMCU(i, j, CbChannel);
+                        PutCrMCU(i, j, CrChannel);
+                    }
+                }
+            }
+        }
+
+        public (ZigzagResult, ZigzagResult, ZigzagResult) ProcessMCU()
+        {
             ZigzagResult yMcu = new();
             ZigzagResult cbMcu = new();
             ZigzagResult crMcu = new();
@@ -133,6 +198,13 @@ namespace FFTTransform.Algorithms
             return bytes;
         }
 
+        public void PutYMCU(int tli, int tlj, byte[,] data)
+        {
+            for (int i = tli; i < tli + MCU_Unit; i++)
+                for (int j = tlj; j < tlj + MCU_Unit; j++)
+                    Image.Data[i, j, 0] = data[i-tli, j- tlj];
+        }
+
         public byte[,] SampleCbMCU(int tli, int tlj)
         {
             byte[,] bytes = new byte[MCU_Unit, MCU_Unit];
@@ -142,6 +214,13 @@ namespace FFTTransform.Algorithms
             return bytes;
         }
 
+        public void PutCbMCU(int tli, int tlj, byte[,] data)
+        {
+            for (int i = tli / 2; i < tli / 2 + MCU_Unit; i++)
+                for (int j = tlj / 2; j < tlj / 2 + MCU_Unit; j++)
+                    DownsampledCbCr.Data[i, j, 1] = data[i - tli / 2, j - tlj / 2];
+        }
+
         public byte[,] SampleCrMCU(int tli, int tlj)
         {
             byte[,] bytes = new byte[MCU_Unit, MCU_Unit];
@@ -149,6 +228,13 @@ namespace FFTTransform.Algorithms
                 for (int j = tlj/2; j < tlj/2 + MCU_Unit; j++)
                     bytes[i - tli / 2, j - tlj / 2] = DownsampledCbCr.Data[i, j, 2];
             return bytes;
+        }
+
+        public void PutCrMCU(int tli, int tlj, byte[,] data)
+        {
+            for (int i = tli / 2; i < tli / 2 + MCU_Unit; i++)
+                for (int j = tlj / 2; j < tlj / 2 + MCU_Unit; j++)
+                    DownsampledCbCr.Data[i, j, 2] = data[i - tli / 2, j - tlj / 2];
         }
     }
 }

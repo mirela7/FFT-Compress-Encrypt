@@ -192,5 +192,33 @@ namespace FFTTransform.Utils
             }
         }
 
+        internal static void ReadJpeg(string path, out int width, out int height, out HuffmanCoder dcY, out HuffmanCoder dcC, out HuffmanCoder acY, out HuffmanCoder acC)
+        {
+            using (FileStream fs = new FileStream(path, FileMode.Open, FileAccess.Read))
+            {
+                using (BinaryReader br = new BinaryReader(fs))
+                {
+                    width = br.ReadInt32();
+                    height = br.ReadInt32();
+
+                    HuffmanCoder[] encodings = new HuffmanCoder[4];
+                    for(int i = 0; i < encodings.Length; i++)
+                    {
+                        encodings[i] = new HuffmanCoder();
+                        encodings[i].Tree = new HuffmanTree();
+
+                        encodings[i].Decode(br.ReadCompact());
+                        encodings[i].Tree!.ReadTreeDictionary(br);
+                    }
+
+                    dcY = encodings[0];
+                    dcC = encodings[1];
+                    acY = encodings[2];
+                    acC = encodings[3];
+
+                }
+            }
+        }
+
     }
 }

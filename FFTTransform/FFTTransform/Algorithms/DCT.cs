@@ -99,9 +99,6 @@ namespace FFTTransform.Algorithms
             return x;
         }
 
-
-        
-
         public static double[,] DCT2D(double[,] inputImage, bool invert = false)
         {
             double[,] finalImage = new double[inputImage.GetLength(0), inputImage.GetLength(1)];
@@ -136,6 +133,11 @@ namespace FFTTransform.Algorithms
             }
 
             return finalImage;
+        }
+      
+        internal byte[,] InverseTransform(int[,] yChannelBefore)
+        {
+            throw new NotImplementedException();
         }
     }
 }

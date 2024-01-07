@@ -73,6 +73,7 @@ namespace FFTTransform.Algorithms.Encoder
 
         public HuffmanNode Root { get; set; }
         public Dictionary<JpegTriplet, BitArray> TripletToBitArrayDict { get; set; }
+        public Dictionary<BitArray, JpegTriplet> BitArrayToTripletDict { get; set; }
 
         public BitArray TripletsOrderedEncodings { get; set; }
 
@@ -103,6 +104,11 @@ namespace FFTTransform.Algorithms.Encoder
             }
         }
 
+        public HuffmanTree()
+        {
+
+        }
+
         public void WriteTreeDictionary(BinaryWriter bw)
         {
             bw.Write(TripletsOrderedEncodings.Count);
@@ -113,6 +119,40 @@ namespace FFTTransform.Algorithms.Encoder
                 bw.Write(trp.Coeff);
                 bw.WriteCompact(entry.Value);
             }
+        }
+
+        public void ReadTreeDictionary(BinaryReader br)
+        {
+            int len = br.ReadInt32();
+            BitArrayToTripletDict = new();
+
+            
+            for(int i = 0; i < len; i++)
+            {
+                JpegTriplet readTriplet = new();
+                readTriplet.NmbBitsForCoeff = br.ReadChar();
+                readTriplet.Coeff = br.ReadInt16();
+                BitArray representation = br.ReadCompact();
+
+                BitArrayToTripletDict.Add(representation, readTriplet);
+            }
+
+        }
+
+        public List<JpegTriplet> DecodeBitArray(BitArray bitArray)
+        {
+            List<JpegTriplet> result = new List<JpegTriplet>();
+            BitArray currentRepresentation = new BitArray(0);
+            for(int i = 0; i < bitArray.Length; i++)
+            {
+                currentRepresentation = currentRepresentation.Append(new BitArray(1, bitArray[i]));
+                if (BitArrayToTripletDict.ContainsKey(currentRepresentation))
+                {
+                    result.Add(BitArrayToTripletDict[currentRepresentation]);
+                    currentRepresentation = new BitArray(0);
+                }
+            }
+            return result;
         }
 
         public void InitializeTripletEncodings()
@@ -147,7 +187,6 @@ namespace FFTTransform.Algorithms.Encoder
             }
             return dict;
         }
-        
     }
 
 
@@ -164,6 +203,12 @@ namespace FFTTransform.Algorithms.Encoder
         internal void Encode()
         {
             Tree = new HuffmanTree(Triplets);
+        }
+
+        internal void Decode(BitArray bitArray)
+        {
+            // Decodes the bitArray into List<Triplets> using HuffmanTree
+            Triplets = Tree!.DecodeBitArray(bitArray);
         }
 
         /*internal (int, byte[]) GetBitstring()
