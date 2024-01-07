@@ -72,7 +72,7 @@ namespace FFTTransform.Algorithms
 
 
 
-        private static int[] GetPermutationOfIndices(int n)
+        public static int[] GetPermutationOfIndices(int n)
         {
             int[] result = new int[n];
             for (int i = 1, j = 0; i < n; i++)
@@ -102,7 +102,7 @@ namespace FFTTransform.Algorithms
             // groups of size len
             for (int len = 2; len <= n; len <<= 1)
             {
-                double ang = 2 * Math.PI / n * (invert ? 1 : -1); // twiddle factor
+                double ang = 2 * Math.PI / len * (invert ? 1 : -1); // twiddle factor
                 Complex w_n = new Complex(Math.Cos(ang), Math.Sin(ang));
                 for (int i = 0; i < n; i += len)
                 {
@@ -123,6 +123,7 @@ namespace FFTTransform.Algorithms
                     vect[i] /= n;
 
         }
+
 
 
         private static void PrintList<T>(String message, List<T> val)
