@@ -72,7 +72,7 @@ namespace FFTTransform.Algorithms
 
 
 
-        private static int[] GetPermutationOfIndices(int n)
+        public static int[] GetPermutationOfIndices(int n)
         {
             int[] result = new int[n];
             for (int i = 1, j = 0; i < n; i++)
