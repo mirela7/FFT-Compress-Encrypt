@@ -2,6 +2,7 @@
 using Emgu.CV.Structure;
 using FFTTransform.Utils;
 using Microsoft.Win32;
+using System.Diagnostics;
 using System.IO;
 using System.Reflection;
 using System.Security.Principal;
@@ -59,8 +60,18 @@ namespace FFTTransform
                                 Algorithms.FFT.KeepPerentage = keepPct;
                         }
                         Console.WriteLine("Compression starting...");
+                        var timer = new Stopwatch();
+                        timer.Start();
                         Algorithms.FFT.CompressImageByPath(args[1]);
-                        Console.WriteLine("Compressed image.");
+
+                        //B: Run stuff you want timed
+                        timer.Stop();
+
+                        TimeSpan timeTaken = timer.Elapsed;
+                        string foo = "Time taken: " + timeTaken.ToString(@"m\:ss\.fff");
+                        Console.WriteLine($"Compressed image. {foo}");
+                        Console.ReadKey();
+
                         break;
                     case OPERATION_OPEN:
                         Algorithms.FFT.OpenCompressedImage(args[1]);

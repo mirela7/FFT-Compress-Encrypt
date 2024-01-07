@@ -15,6 +15,9 @@ PI project
 | <img src="./data/img-1024-s32H_1.bmp" width="150px" /> | 1% |<img src="./data/img-1024-s32H_1_compressed_decompressed.bmp" width="150px" /> | Original size: 13.1 KB <br> Compressed binary: 1.97 KB |
 
 
+## Changelog 
+- implemented fft iterative version (for test image 30% faster)
+
 # Reference
 1. [Optical image encryption using different twiddle factors in the butterfly algorithm of FFT](https://www.sciencedirect.com/science/article/pii/S0030401820311263?ref=pdf_download&fr=RR-2&rr=821ca33efbc0284e)
 2. [FFT Based Compression Approach for Medical Images](https://www.ripublication.com/ijaer18/ijaerv13n6_54.pdf)
