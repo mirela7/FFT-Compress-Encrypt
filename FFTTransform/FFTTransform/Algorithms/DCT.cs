@@ -12,7 +12,10 @@ namespace FFTTransform.Algorithms
         public DCT() { }
 
         public double[,] Transform(double[,] matrix, bool inverse)
-        { 
+        {
+            for (int i = 0; i < matrix.GetLength(0); i++)
+                for (int j = 0; j < matrix.GetLength(1); j++)
+                    matrix[i, j] = matrix[i, j] + (inverse ? -1 : +1) * 127;
             return DCT2D(matrix, inverse);
         }
 
@@ -52,7 +55,7 @@ namespace FFTTransform.Algorithms
 
         }
 
-        public static double[,] ConvertImageToDoubleMatrix(byte[,] inputImage)
+        public static double[,] ConvertByteMatrixToDoubleMatrix(byte[,] inputImage)
         {
             double[,] img = new double[inputImage.GetLength(0), inputImage.GetLength(1)];
             for (int i = 0; i < inputImage.GetLength(0); i++)
@@ -60,6 +63,19 @@ namespace FFTTransform.Algorithms
                 for (int j = 0; j < inputImage.GetLength(1); j++)
                 {
                     img[i, j] = inputImage[i, j];
+                }
+            }
+            return img;
+        }
+
+        public static byte[,] ConvertDoubleMatrixToByteMatrix(double[,] inputImage)
+        {
+            byte[,] img = new byte[inputImage.GetLength(0), inputImage.GetLength(1)];
+            for (int i = 0; i < inputImage.GetLength(0); i++)
+            {
+                for (int j = 0; j < inputImage.GetLength(1); j++)
+                {
+                    img[i, j] = (byte)inputImage[i, j];
                 }
             }
             return img;

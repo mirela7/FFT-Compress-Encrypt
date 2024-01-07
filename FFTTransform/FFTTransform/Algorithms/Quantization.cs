@@ -54,5 +54,18 @@ namespace FFTTransform.Algorithms
             }
             return finalImage;
         }
+
+        public static double[,] Dequantize(int[,] inputImage, QuantizationType type)
+        {
+
+            int[,] quantMatrix = GetQuantizedMatrix(type);
+            double[,] finalImage = new double[inputImage.GetLength(0), inputImage.GetLength(1)];
+            for (int i = 0; i < inputImage.GetLength(0); i++)
+            {
+                for (int j = 0; j < inputImage.GetLength(1); j++)
+                    finalImage[i, j] = inputImage[i, j] * quantMatrix[i, j];
+            }
+            return finalImage;
+        }
     }
 }

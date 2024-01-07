@@ -57,5 +57,10 @@ namespace FFTTransform.Algorithms.Encoder
             return ZerosBefore == other.ZerosBefore && NmbBitsForCoeff == other.NmbBitsForCoeff && Coeff == other.Coeff;
         }
 
+        public override int GetHashCode()
+        {
+            return HashCode.Combine(ZerosBefore, NmbBitsForCoeff, Coeff);
+        }
+
     }
 }

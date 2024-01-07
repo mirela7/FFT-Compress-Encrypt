@@ -30,6 +30,8 @@ namespace FFTTransform.Utils
                 else
                     pow--;
             }
+            if (index < data.Length && dataByte != 0)
+                data[index++] = dataByte;
 
             bw.Write(length);
             bw.Write(data);
@@ -49,11 +51,14 @@ namespace FFTTransform.Utils
                 byte pow = 7;
                 while(pow >= 0 && index < length)
                 {
-                    arr.Set(index, (byt & (1<<pow)) == 1);
+                    arr.Set(index, (byt & (1<<pow)) != 0);
                     index++;
+                    if (pow == 0)
+                        break;
                     pow--;
                 }
-
+                if (index >= length)
+                    break;
             }
             return arr;
         }

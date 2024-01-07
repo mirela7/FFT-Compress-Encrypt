@@ -1,5 +1,6 @@
 ﻿using Emgu.CV;
 using Emgu.CV.Structure;
+using FFTTransform.Algorithms;
 using FFTTransform.Algorithms.Encoder;
 using FFTTransform.Utils;
 using Microsoft.Win32;
@@ -13,8 +14,10 @@ namespace FFTTransform
 
     internal class Program
     {
-        const string OPERATION_COMPRESS = "compress";
-        const string OPERATION_OPEN = "open";
+        const string OPERATION_COMPRESS_FFT = "compress_fft";
+        const string OPERATION_COMPRESS_DCT = "compress_dct";
+        const string OPERATION_OPEN_FFT = "open_fft";
+        const string OPERATION_OPEN_DCT = "open_dct";
         const string OPERATION_ENCRYPT = "encrypt";
         const string OPERATION_DECRYPT = "decrypt";
 
@@ -24,7 +27,7 @@ namespace FFTTransform
         /// <param name="args"></param>
         static void Main(string[] args)
         {
-            int[,] matrix = {
+            /*int[,] matrix = {
                 {89, 17, 42, 53, 99, 0, 61, 0},
                 {14, 98, 0, 47, 17, 0, 0, 0},
                 {41, 21, 0, 89, 80, 0, 0, 0},
@@ -48,7 +51,7 @@ namespace FFTTransform
 
 
 
-            return;
+            return;*/
             if (IsRunningAsAdmin())
             {
                 Console.WriteLine("Run as admin. Creating registry...");
@@ -62,7 +65,8 @@ namespace FFTTransform
             if(args.Length < 2)
             {
                 Console.WriteLine($"Not enough args: expected 2, got {args.Length}.");
-                args = new string[] { OPERATION_COMPRESS, "C:\\Users\\mirel\\Documents\\GitHub\\FFT-Compress-Encrypt\\data\\grayscale-lamp.png" };
+                args = new string[] { OPERATION_OPEN_DCT , "C:\\Users\\mirel\\Documents\\GitHub\\FFT-Compress-Encrypt\\data\\img15-s2H_dct_compressed.bin" };
+                //args = new string[] { OPERATION_COMPRESS_DCT , "C:\\Users\\mirel\\Documents\\GitHub\\FFT-Compress-Encrypt\\data\\img15-s2H.png" };
             }
             
             try
@@ -70,8 +74,8 @@ namespace FFTTransform
                 string command = args[0];
                 switch (command)
                 {
-                    case OPERATION_COMPRESS:
-                        Console.WriteLine($"{OPERATION_COMPRESS}! Keep Percentage default?");
+                    case OPERATION_COMPRESS_FFT:
+                        Console.WriteLine($"{OPERATION_COMPRESS_FFT}! Keep Percentage default?");
 
                         string response = Console.ReadLine();
                         if (response != null && response.Length > 0 && response[0] == 'n')
@@ -99,10 +103,21 @@ namespace FFTTransform
                         Console.ReadKey();
 
                         break;
-                    case OPERATION_OPEN:
+                    case OPERATION_OPEN_FFT:
+                        Console.WriteLine("Opening FFT-encoded file!");
                         Algorithms.FFT.OpenCompressedImage(args[1]);
                         Console.WriteLine("Opened image.");
                         Console.ReadKey();
+                        break;
+                    case OPERATION_COMPRESS_DCT:
+                        Console.WriteLine("Compressing using DCT!");
+                        CustomJPEG jpeg = new CustomJPEG();
+                        jpeg.Encode(args[1]);
+                        break;
+                    case OPERATION_OPEN_DCT:
+                        Console.WriteLine("Opening DCT-encoded file!");
+                        CustomJPEG jpegDec = new CustomJPEG();
+                        jpegDec.Decode(args[1]);
                         break;
                     case OPERATION_ENCRYPT:
                         break;
@@ -131,7 +146,7 @@ namespace FFTTransform
                 string binKeyLocation = @"SystemFileAssociations\.bin";
 
                 // Navigate to "Computer\HKEY_CLASSES_ROOT\SystemFileAssociations\.png\Shell"
-                /*using (RegistryKey imageShellKey = Registry.ClassesRoot.OpenSubKey(imageShell, true))
+                using (RegistryKey imageShellKey = Registry.ClassesRoot.OpenSubKey(imageShell, true))
                 {
                     if (imageShellKey != null)
                     {
@@ -150,7 +165,7 @@ namespace FFTTransform
                                 using (RegistryKey commandKey = ttfAppKey.CreateSubKey("command"))
                                 {
                                     // Set default value of the command key
-                                    commandKey.SetValue("", $"\"{exePath}\" \"{OPERATION_COMPRESS}\" \"%1\"");
+                                    commandKey.SetValue("", $"\"{exePath}\" \"{OPERATION_COMPRESS_FFT}\" \"%1\"");
 
                                     // Set default value of TTFApp key
                                     ttfAppKey.SetValue("", "Compress using FFTTransform");
@@ -170,7 +185,7 @@ namespace FFTTransform
                     {
                         Console.WriteLine("ImageRegistry key not found. Make sure the specified path exists.");
                     }
-                }*/
+                }
 
                 Console.WriteLine("Before open subkey");
                 using (RegistryKey binShellKey = Registry.ClassesRoot.OpenSubKey(binKeyLocation, true))
@@ -196,7 +211,7 @@ namespace FFTTransform
                                 using (RegistryKey commandKey = ttfAppKey.CreateSubKey("command"))
                                 {
                                         // Set default value of the command key
-                                    commandKey.SetValue("", $"\"{exePath}\" \"{OPERATION_OPEN}\" \"%1\"");
+                                    commandKey.SetValue("", $"\"{exePath}\" \"{OPERATION_OPEN_FFT}\" \"%1\"");
 
                                     // Set default value of TTFApp key
                                     ttfAppKey.SetValue("", "Open using FFTTransform");
@@ -225,7 +240,7 @@ namespace FFTTransform
                                             if (baseKey == null)
                                                 Console.WriteLine("commandKey null.");
                                             else Console.WriteLine("commandKey created");
-                                            commandKey.SetValue("", $"\"{exePath}\" \"{OPERATION_OPEN}\" \"%1\"");
+                                            commandKey.SetValue("", $"\"{exePath}\" \"{OPERATION_OPEN_FFT}\" \"%1\"");
                                             ttfKey.SetValue("", "Open using FFTTransform");
                                             ttfKey.SetValue("Icon", @$"{exeDirectory}\fft.ico");
                                         }

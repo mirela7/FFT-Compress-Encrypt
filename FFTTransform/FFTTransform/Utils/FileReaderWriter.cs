@@ -180,12 +180,12 @@ namespace FFTTransform.Utils
                     bw.Write(height);
 
                     HuffmanCoder[] encodings = new HuffmanCoder[] { dcY, dcC, acY, acC };
-                    foreach(HuffmanCoder en in encodings)
+                    foreach (HuffmanCoder en in encodings)
                     {
                         BitArray array = en.Tree!.TripletsOrderedEncodings;
-                        bw.WriteCompact(array);
 
                         en.Tree.WriteTreeDictionary(bw);
+                        bw.WriteCompact(array);
                     }
 
                 }
@@ -202,13 +202,13 @@ namespace FFTTransform.Utils
                     height = br.ReadInt32();
 
                     HuffmanCoder[] encodings = new HuffmanCoder[4];
-                    for(int i = 0; i < encodings.Length; i++)
+                    for (int i = 0; i < encodings.Length; i++)
                     {
                         encodings[i] = new HuffmanCoder();
                         encodings[i].Tree = new HuffmanTree();
 
-                        encodings[i].Decode(br.ReadCompact());
                         encodings[i].Tree!.ReadTreeDictionary(br);
+                        encodings[i].Decode(br.ReadCompact());
                     }
 
                     dcY = encodings[0];

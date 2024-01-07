@@ -111,7 +111,7 @@ namespace FFTTransform.Algorithms.Encoder
 
         public void WriteTreeDictionary(BinaryWriter bw)
         {
-            bw.Write(TripletsOrderedEncodings.Count);
+            bw.Write(TripletToBitArrayDict.Count);
             foreach (var entry in TripletToBitArrayDict)
             {
                 JpegTriplet trp = entry.Key;
@@ -124,13 +124,13 @@ namespace FFTTransform.Algorithms.Encoder
         public void ReadTreeDictionary(BinaryReader br)
         {
             int len = br.ReadInt32();
-            BitArrayToTripletDict = new();
+            BitArrayToTripletDict = new(new BitArrayComparer());
 
             
             for(int i = 0; i < len; i++)
             {
                 JpegTriplet readTriplet = new();
-                readTriplet.NmbBitsForCoeff = br.ReadChar();
+                readTriplet.ZerosBefore = br.ReadChar();
                 readTriplet.Coeff = br.ReadInt16();
                 BitArray representation = br.ReadCompact();
 
@@ -157,7 +157,7 @@ namespace FFTTransform.Algorithms.Encoder
 
         public void InitializeTripletEncodings()
         {
-            TreeTraverse(Root, new BitArray(0));
+            TreeTraverse(Root, new BitArray(1, false));
         }
 
         public void TreeTraverse(HuffmanNode? currentNode, BitArray bitString)

@@ -30,16 +30,26 @@ namespace FFTTransform.Algorithms.Encoder
 
             public void AddZigZag(List<JpegTriplet> zigzag)
             {
-                ACs.Add(zigzag[0]);
-                DCs.AddRange(zigzag.Skip(1));
+                if (zigzag[0].ZerosBefore == 0)
+                {
+                    ACs.Add(zigzag[0]);
+                    DCs.AddRange(zigzag.Skip(1));
+                }
+                else
+                {
+                    ACs.Add(new JpegTriplet(0, 0, 0));
+                    zigzag[0].ZerosBefore--;
+                    DCs.AddRange(zigzag);
+                }
             }
 
             public List<JpegTriplet> PopZigZag()
             {
                 List<JpegTriplet> elements = new();
                 elements.Add(ACs[0]);
+                ACs.RemoveAt(0);
                 elements.AddRange(DCs.TakeWhile((triplet) => triplet != JpegTriplet.EOB()));
-                DCs = (List<JpegTriplet>)DCs.Skip(elements.Count);
+                DCs = DCs.Skip(elements.Count).ToList();
                 return elements;
             }
         }
@@ -86,9 +96,7 @@ namespace FFTTransform.Algorithms.Encoder
 
                 direction *= -1;
             }*/
-            foreach (var x in zigZagTraverse)
-                Console.Write($"{x} ");
-
+            
             List<JpegTriplet> rlEncoded = new();
             int count0 = 0;
             foreach(var x in zigZagTraverse)
@@ -108,10 +116,9 @@ namespace FFTTransform.Algorithms.Encoder
         public static int[,] ZigZagDecode(List<JpegTriplet> zigZag, int mcuUnit)
         {
             int[,] section = new int[8, 8];
-            JpegTriplet EOB = JpegTriplet.EOB();
             List<int> decompressedZigzag = new();
             int i;
-            for(i = 0; zigZag[i] != EOB; i++)
+            for(i = 0; i < zigZag.Count; i++)
             {
                 while (zigZag[i].ZerosBefore != (char)0)
                 {
@@ -119,7 +126,6 @@ namespace FFTTransform.Algorithms.Encoder
                     zigZag[i].ZerosBefore--;
                 }
                 decompressedZigzag.Add(zigZag[i].Coeff);
-                i++;
             }
 
             while (decompressedZigzag.Count < mcuUnit * mcuUnit)

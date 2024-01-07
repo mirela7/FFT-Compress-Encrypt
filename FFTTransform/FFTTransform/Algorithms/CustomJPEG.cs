@@ -15,7 +15,7 @@ namespace FFTTransform.Algorithms
     using static System.Net.Mime.MediaTypeNames;
     using ZigzagResult = RunLengthCoder.ChannelDcAcResult;
 
-    public class CustomJPEG<T1, T2>
+    public class CustomJPEG
     {
         const short MCU_Unit = 8;
 
@@ -26,10 +26,13 @@ namespace FFTTransform.Algorithms
         //public FourierRelatedTransform<T, object> Transform { get; set; }
         public DCT Transform { get; set; }
 
-        public CustomJPEG(string path)
+        public CustomJPEG()
         {
             Transform = new DCT();
+        }
 
+        public void InitImage(string path)
+        {
             Mat inputImage = CvInvoke.Imread(path);
             if (inputImage == null || inputImage.IsEmpty)
                 throw new ArgumentException("Invalid path.");
@@ -47,8 +50,11 @@ namespace FFTTransform.Algorithms
 
         public void Encode(string path)
         {
+            InitImage(path);
+            Console.WriteLine("Downsampling...");
             ChromaDownsample();
             ZigzagResult y, cb, cr;
+            Console.WriteLine("Processing MCUs...");
             (y, cb, cr) = ProcessMCU();
 
             HuffmanCoder dcY = new(), dcC = new(), acY = new(), acC = new();
@@ -62,13 +68,14 @@ namespace FFTTransform.Algorithms
             acC.AddRange(cb.ACs);
             acC.AddRange(cr.ACs);
 
+            Console.WriteLine("Hufman encoding MCUs...");
             dcY.Encode();
             dcC.Encode();
             acY.Encode();
             acC.Encode();
 
-            string outputPath = $"{PathUtil.GetPathWithoutFileExtension(path)}_decompressed.bin";
-
+            string outputPath = $"{PathUtil.GetPathWithoutFileExtension(path)}_dct_compressed.bin";
+            Console.WriteLine("Writing to file...");
             FileReaderWriter.WriteJpeg(outputPath, Image.Width, Image.Height, dcY, dcC, acY, acC);
         }
 
@@ -84,9 +91,12 @@ namespace FFTTransform.Algorithms
 
             string outputPath = $"{PathUtil.GetPathWithoutFileExtension(path)}_decompressed.bmp";
 
-            CvInvoke.Imwrite(outputPath, Image);
-            CvInvoke.Imshow("Image", Image);
-            CvInvoke.WaitKey();
+            Image<Bgr, byte> transformed = Image.Convert<Bgr, byte>();
+            Console.WriteLine("Writing image...");
+            CvInvoke.Imwrite(outputPath, transformed);
+            Console.WriteLine("Opening image...");
+            //CvInvoke.Imshow("Image", transformed);
+            //CvInvoke.WaitKey();
         }
 
         public void ChromaDownsample()
@@ -105,8 +115,8 @@ namespace FFTTransform.Algorithms
 
         public void ChromaUpsample()
         {
-            for(int i = 0; i <= Image.Height; i ++)
-                for(int j = 0; j <= Image.Width; j++)
+            for(int i = 0; i < Image.Height; i ++)
+                for(int j = 0; j < Image.Width; j++)
                 {
                     Image.Data[i, j, 1] = DownsampledCbCr.Data[i / 2, j / 2, 1];
                     Image.Data[i, j, 2] = DownsampledCbCr.Data[i / 2, j / 2, 2];
@@ -119,16 +129,18 @@ namespace FFTTransform.Algorithms
             ZigzagResult yMcu = new(acY.Triplets, dcY.Triplets);
             ZigzagResult cMcu = new(acC.Triplets, dcC.Triplets);
             Image = new Image<Ycc, byte>(imageWidth, imageHeight);
+            DownsampledCbCr = new Image<Ycc, byte>(Image.Width / 2, Image.Height / 2);
 
             for (int i = 0; i < imageWidth; i+=MCU_Unit)
             {
                 for(int j = 0; j < imageHeight; j += MCU_Unit)
                 {
-                    List<JpegTriplet> unitYList = yMcu.PopZigZag();
+                     List<JpegTriplet> unitYList = yMcu.PopZigZag();
                     int[,] YChannelBefore = RunLengthCoder.ZigZagDecode(unitYList, MCU_Unit);
 
+                    double[,] YDequan = Quantization.Dequantize(YChannelBefore, Quantization.QuantizationType.YQUANTIZATION);
                     //YChannelBefore = Quantization.Dequantize(YChannelBefore, Type.Y);
-                    byte[,] YChannel = Transform.InverseTransform(YChannelBefore);
+                    byte[,] YChannel = DCT.ConvertDoubleMatrixToByteMatrix(Transform.Transform(YDequan, inverse:true));
 
                     PutYMCU(i, j, YChannel);
 
@@ -140,11 +152,15 @@ namespace FFTTransform.Algorithms
                         int[,] CbChannelBefore = RunLengthCoder.ZigZagDecode(unitCbList, MCU_Unit);
                         int[,] CrChannelBefore = RunLengthCoder.ZigZagDecode(unitCrList, MCU_Unit);
 
+                        double[,] CbDequan = Quantization.Dequantize(CbChannelBefore, Quantization.QuantizationType.CQUANTIZATION);
+                        double[,] CrDequan = Quantization.Dequantize(CrChannelBefore, Quantization.QuantizationType.CQUANTIZATION);
+
+
                         //CbChannelBefore = Quantization.Dequantize(CbChannelBefore, Type.Y);
                         //CrChannelBefore = Quantization.Dequantize(CrChannelBefore, Type.Y);
 
-                        byte[,] CbChannel = Transform.InverseTransform(CbChannelBefore);
-                        byte[,] CrChannel = Transform.InverseTransform(CrChannelBefore);
+                        byte[,] CbChannel = DCT.ConvertDoubleMatrixToByteMatrix(Transform.Transform(CbDequan, inverse:true));
+                        byte[,] CrChannel = DCT.ConvertDoubleMatrixToByteMatrix(Transform.Transform(CrDequan, inverse:true));
                         
                         PutCbMCU(i, j, CbChannel);
                         PutCrMCU(i, j, CrChannel);
@@ -165,7 +181,8 @@ namespace FFTTransform.Algorithms
                 {
                     byte[,] YChannel = SampleYMCU(i, j);
 
-                    int[,] YTransformed = Transform.Transform(YChannel);
+                    double[,] yPrepared = DCT.ConvertByteMatrixToDoubleMatrix(YChannel);
+                    int[,] YTransformed = Quantization.Quantize(Transform.Transform(yPrepared, inverse:false), Quantization.QuantizationType.YQUANTIZATION);
                     List<JpegTriplet> YCompressed = RunLengthCoder.ZigZagCode(YTransformed);
                     
                     yMcu.AddZigZag(YCompressed);
@@ -174,9 +191,13 @@ namespace FFTTransform.Algorithms
                     {
                         byte[,] CbChannel = SampleCbMCU(i, j);
                         byte[,] CrChannel = SampleCrMCU(i, j);
+                        
+                        double[,] cbPrepared = DCT.ConvertByteMatrixToDoubleMatrix(CbChannel);
+                        double[,] crPrepared = DCT.ConvertByteMatrixToDoubleMatrix(CrChannel);
 
-                        int[,] CbTransformed = Transform.Transform(CbChannel);
-                        int[,] CrTransformed = Transform.Transform(CrChannel);
+
+                        int[,] CbTransformed = Quantization.Quantize(Transform.Transform(cbPrepared, inverse: false), Quantization.QuantizationType.CQUANTIZATION);
+                        int[,] CrTransformed = Quantization.Quantize(Transform.Transform(crPrepared, inverse: false), Quantization.QuantizationType.CQUANTIZATION);
 
                         List<JpegTriplet> CbCompressed = RunLengthCoder.ZigZagCode(CbTransformed);
                         List<JpegTriplet> CrCompressed = RunLengthCoder.ZigZagCode(CrTransformed);
