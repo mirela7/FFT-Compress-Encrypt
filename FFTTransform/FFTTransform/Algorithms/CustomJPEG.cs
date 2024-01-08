@@ -102,7 +102,7 @@ namespace FFTTransform.Algorithms
             Console.WriteLine("Upsampling...");
             ChromaUpsample();
 
-            string outputPath = $"{PathUtil.GetPathWithoutFileExtension(path)}_decompressed.bmp";
+            string outputPath = $"{PathUtil.GetPathWithoutFileExtension(path)}_decompressed.png";
 
             Image<Bgr, byte> transformed = Image.Convert<Bgr, byte>();
             CvInvoke.Imwrite(outputPath, transformed);
