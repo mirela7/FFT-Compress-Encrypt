@@ -23,6 +23,13 @@ namespace FFTTransform.Algorithms.Encoder
             Coeff = coefficient;
         }
 
+        public JpegTriplet(JpegTriplet jpegTriplet)
+        {
+            ZerosBefore = jpegTriplet.ZerosBefore;
+            NmbBitsForCoeff = jpegTriplet.NmbBitsForCoeff;
+            Coeff = jpegTriplet.Coeff;
+        }
+
         public char ZerosBefore { get; set; }
         public char NmbBitsForCoeff { get; set; }
         public short Coeff { get; set; }

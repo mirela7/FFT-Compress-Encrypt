@@ -36,7 +36,14 @@ namespace FFTTransform.Algorithms
             Mat inputImage = CvInvoke.Imread(path);
             if (inputImage == null || inputImage.IsEmpty)
                 throw new ArgumentException("Invalid path.");
-            if (inputImage.Depth == DepthType.Cv8U && inputImage.NumberOfChannels == 3)
+            
+            Console.WriteLine("Is it grayscale? Defaults to 'no'");
+            string response = Console.ReadLine();
+            bool isGrayscale = false;
+            if (response != null && response.Length > 0 && response[0] == 'y')
+                isGrayscale = true;
+
+            if (!isGrayscale)
             {
                 Image<Bgr, byte> colorImage = new(inputImage);
                 Image = colorImage.Convert<Ycc, byte>();
@@ -68,10 +75,13 @@ namespace FFTTransform.Algorithms
             acC.AddRange(cb.ACs);
             acC.AddRange(cr.ACs);
 
-            Console.WriteLine("Hufman encoding MCUs...");
+            Console.WriteLine("Hufman encoding dcY MCUs...");
             dcY.Encode();
+            Console.WriteLine("Hufman encoding dcC MCUs...");
             dcC.Encode();
+            Console.WriteLine("Hufman encoding acY MCUs...");
             acY.Encode();
+            Console.WriteLine("Hufman encoding acC MCUs...");
             acC.Encode();
 
             string outputPath = $"{PathUtil.GetPathWithoutFileExtension(path)}_dct_compressed.bin";
@@ -84,18 +94,19 @@ namespace FFTTransform.Algorithms
             int imageWidth, imageHeight;
             HuffmanCoder dcY, dcC, acY, acC;
 
+            Console.WriteLine("Reading data...");
             FileReaderWriter.ReadJpeg(path, out imageWidth, out imageHeight, out dcY, out dcC, out acY, out acC);
 
+            Console.WriteLine("Rebuilding MCUs....");
             RebuildMCU(imageWidth, imageHeight, dcY, dcC, acY, acC);
+            Console.WriteLine("Upsampling...");
             ChromaUpsample();
 
             string outputPath = $"{PathUtil.GetPathWithoutFileExtension(path)}_decompressed.bmp";
 
             Image<Bgr, byte> transformed = Image.Convert<Bgr, byte>();
-            Console.WriteLine("Writing image...");
             CvInvoke.Imwrite(outputPath, transformed);
-            Console.WriteLine("Opening image...");
-            //CvInvoke.Imshow("Image", transformed);
+            CvInvoke.Imshow("Image", transformed);
             //CvInvoke.WaitKey();
         }
 
@@ -131,16 +142,17 @@ namespace FFTTransform.Algorithms
             Image = new Image<Ycc, byte>(imageWidth, imageHeight);
             DownsampledCbCr = new Image<Ycc, byte>(Image.Width / 2, Image.Height / 2);
 
+
             for (int i = 0; i < imageWidth; i+=MCU_Unit)
             {
-                for(int j = 0; j < imageHeight; j += MCU_Unit)
+                for (int j = 0; j < imageHeight; j += MCU_Unit)
                 {
-                     List<JpegTriplet> unitYList = yMcu.PopZigZag();
+                    List<JpegTriplet> unitYList = yMcu.PopZigZag();
                     int[,] YChannelBefore = RunLengthCoder.ZigZagDecode(unitYList, MCU_Unit);
 
                     double[,] YDequan = Quantization.Dequantize(YChannelBefore, Quantization.QuantizationType.YQUANTIZATION);
-                    //YChannelBefore = Quantization.Dequantize(YChannelBefore, Type.Y);
                     byte[,] YChannel = DCT.ConvertDoubleMatrixToByteMatrix(Transform.Transform(YDequan, inverse:true));
+
 
                     PutYMCU(i, j, YChannel);
 
@@ -183,8 +195,10 @@ namespace FFTTransform.Algorithms
 
                     double[,] yPrepared = DCT.ConvertByteMatrixToDoubleMatrix(YChannel);
                     int[,] YTransformed = Quantization.Quantize(Transform.Transform(yPrepared, inverse:false), Quantization.QuantizationType.YQUANTIZATION);
-                    List<JpegTriplet> YCompressed = RunLengthCoder.ZigZagCode(YTransformed);
                     
+                    List<JpegTriplet> YCompressed = RunLengthCoder.ZigZagCode(YTransformed);
+
+
                     yMcu.AddZigZag(YCompressed);
 
                     if(i % (2*MCU_Unit) == 0 && j % (2*MCU_Unit) == 0)

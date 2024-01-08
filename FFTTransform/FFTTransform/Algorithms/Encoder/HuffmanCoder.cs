@@ -82,9 +82,11 @@ namespace FFTTransform.Algorithms.Encoder
             Dictionary<JpegTriplet, int> freqs = CalculateFrequency(triplets);
             PriorityQueue<HuffmanNode, int> Q = new();
 
+            Console.WriteLine("Priority queue construction...");
             foreach(var entry in freqs)
                 Q.Enqueue(HuffmanNode.Leaf(entry.Key, entry.Value), entry.Value);
 
+            Console.WriteLine("Tree construction...");
             while(Q.Count >= 2)
             {
                 HuffmanNode n1 = Q.Dequeue();
@@ -95,13 +97,20 @@ namespace FFTTransform.Algorithms.Encoder
             Root = Q.Dequeue();
 
             TripletToBitArrayDict = new();
+            Console.WriteLine("Tree traversing...");
             InitializeTripletEncodings();
 
-            TripletsOrderedEncodings = new BitArray(0);
+            Console.WriteLine("Encoding into bit arrays...");
+            List<bool> bytes = new List<bool>();
             foreach(var t in triplets)
             {
-                TripletsOrderedEncodings = TripletsOrderedEncodings.Append(TripletToBitArrayDict[t]);
+                bool[] byteArray = new bool[TripletToBitArrayDict[t].Count];
+                TripletToBitArrayDict[t].CopyTo(byteArray, 0);
+                bytes.AddRange(byteArray);
+                //bytes.AddRange(TripletToBitArrayDict[t].OfType<byte>());
             }
+            TripletsOrderedEncodings = new BitArray(bytes.ToArray());
+            //TripletsOrderedEncodings = TripletsOrderedEncodings.Append(TripletToBitArrayDict[t]);
         }
 
         public HuffmanTree()
@@ -142,14 +151,17 @@ namespace FFTTransform.Algorithms.Encoder
         public List<JpegTriplet> DecodeBitArray(BitArray bitArray)
         {
             List<JpegTriplet> result = new List<JpegTriplet>();
-            BitArray currentRepresentation = new BitArray(0);
+            //BitArray currentRepresentation = new BitArray(0);
+            List<bool> bits = new List<bool>();
             for(int i = 0; i < bitArray.Length; i++)
             {
-                currentRepresentation = currentRepresentation.Append(new BitArray(1, bitArray[i]));
+                bits.Add(bitArray[i]);
+                //currentRepresentation = currentRepresentation.Append(new BitArray(1, bitArray[i]));
+                BitArray currentRepresentation = new BitArray(bits.ToArray());
                 if (BitArrayToTripletDict.ContainsKey(currentRepresentation))
                 {
-                    result.Add(BitArrayToTripletDict[currentRepresentation]);
-                    currentRepresentation = new BitArray(0);
+                    result.Add(new JpegTriplet(BitArrayToTripletDict[currentRepresentation]));
+                    bits.Clear();
                 }
             }
             return result;
@@ -157,20 +169,24 @@ namespace FFTTransform.Algorithms.Encoder
 
         public void InitializeTripletEncodings()
         {
-            TreeTraverse(Root, new BitArray(1, false));
+            TreeTraverse(Root, new List<bool>() { false });
         }
 
-        public void TreeTraverse(HuffmanNode? currentNode, BitArray bitString)
+        public void TreeTraverse(HuffmanNode? currentNode, List<bool> bitString)
         {
             if (currentNode is null)
                 return;
             if(currentNode.IsLeaf())
             {
-                TripletToBitArrayDict.Add(currentNode.Value!, bitString);
+                bool[] byteArray = bitString.ToArray();
+                TripletToBitArrayDict.Add(currentNode.Value!, new(byteArray));
                 return;
             }
-            TreeTraverse(currentNode.LeftChild, bitString.Append(new BitArray(1, false)));
-            TreeTraverse(currentNode.RightChild, bitString.Append(new BitArray(1, true)));
+            bitString.Add(false);
+            TreeTraverse(currentNode.LeftChild, bitString);
+            bitString[bitString.Count - 1] = true;
+            TreeTraverse(currentNode.RightChild, bitString);
+            bitString.RemoveAt(bitString.Count - 1);
 
         }
 

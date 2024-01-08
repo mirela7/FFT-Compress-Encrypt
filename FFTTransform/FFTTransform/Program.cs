@@ -4,6 +4,7 @@ using FFTTransform.Algorithms;
 using FFTTransform.Algorithms.Encoder;
 using FFTTransform.Utils;
 using Microsoft.Win32;
+using System.Collections;
 using System.Diagnostics;
 using System.IO;
 using System.Reflection;
@@ -52,6 +53,7 @@ namespace FFTTransform
 
 
             return;*/
+
             if (IsRunningAsAdmin())
             {
                 Console.WriteLine("Run as admin. Creating registry...");
@@ -65,7 +67,7 @@ namespace FFTTransform
             if(args.Length < 2)
             {
                 Console.WriteLine($"Not enough args: expected 2, got {args.Length}.");
-                args = new string[] { OPERATION_OPEN_DCT , "C:\\Users\\mirel\\Documents\\GitHub\\FFT-Compress-Encrypt\\data\\img15-s2H_dct_compressed.bin" };
+                args = new string[] { OPERATION_OPEN_DCT , "C:\\Users\\mirel\\Documents\\GitHub\\FFT-Compress-Encrypt\\data\\grayscale-lamp_dct_compressed.bin" };
                 //args = new string[] { OPERATION_COMPRESS_DCT , "C:\\Users\\mirel\\Documents\\GitHub\\FFT-Compress-Encrypt\\data\\img15-s2H.png" };
             }
             

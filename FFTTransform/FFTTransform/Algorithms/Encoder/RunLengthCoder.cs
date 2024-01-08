@@ -33,7 +33,10 @@ namespace FFTTransform.Algorithms.Encoder
                 if (zigzag[0].ZerosBefore == 0)
                 {
                     ACs.Add(zigzag[0]);
-                    DCs.AddRange(zigzag.Skip(1));
+                    if(zigzag.Count > 1)
+                        DCs.AddRange(zigzag.Skip(1));
+                    else 
+                        DCs.AddRange(zigzag);
                 }
                 else
                 {
@@ -43,13 +46,17 @@ namespace FFTTransform.Algorithms.Encoder
                 }
             }
 
+            private int indexAtAc = 0;
+            private int indexAtDc = 0;
+
             public List<JpegTriplet> PopZigZag()
             {
                 List<JpegTriplet> elements = new();
-                elements.Add(ACs[0]);
-                ACs.RemoveAt(0);
-                elements.AddRange(DCs.TakeWhile((triplet) => triplet != JpegTriplet.EOB()));
-                DCs = DCs.Skip(elements.Count).ToList();
+                elements.Add(ACs[indexAtAc++]);
+                //ACs.RemoveAt(0);
+                elements.AddRange(DCs.Skip(indexAtDc).TakeWhile((triplet) => triplet != JpegTriplet.EOB()));
+                indexAtDc += elements.Count;
+                //DCs = DCs.Skip(elements.Count).ToList();
                 return elements;
             }
         }

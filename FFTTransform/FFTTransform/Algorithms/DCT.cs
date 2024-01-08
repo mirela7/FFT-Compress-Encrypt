@@ -15,8 +15,21 @@ namespace FFTTransform.Algorithms
         {
             for (int i = 0; i < matrix.GetLength(0); i++)
                 for (int j = 0; j < matrix.GetLength(1); j++)
-                    matrix[i, j] = matrix[i, j] + (inverse ? -1 : +1) * 127;
-            return DCT2D(matrix, inverse);
+                    matrix[i, j] = matrix[i, j] + (inverse ? 0 : -1) * 128;
+            double[,] output = DCT2D(matrix, inverse);
+
+            /*for (int k = 0; k < 8; k++)
+            {
+                for (int l = 0; l < 8; l++)
+                    Console.Write($"{output[k, l]} ");
+                Console.Write("\n");
+            }
+            Console.Write("\n");*/
+
+            for (int i = 0; i < matrix.GetLength(0); i++)
+                for (int j = 0; j < matrix.GetLength(1); j++)
+                    output[i, j] = output[i, j] + (inverse ? 1 : 0) * 128;
+            return output;
         }
 
         public static double[] dct(double[] row)
@@ -75,7 +88,12 @@ namespace FFTTransform.Algorithms
             {
                 for (int j = 0; j < inputImage.GetLength(1); j++)
                 {
-                    img[i, j] = (byte)inputImage[i, j];
+                    if (inputImage[i, j] > 255)
+                        img[i, j] = 255;
+                    else if (inputImage[i, j] < 0)
+                        img[i, j] = 0;
+                    else
+                        img[i, j] = (byte)inputImage[i, j];
                 }
             }
             return img;
